@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Office Booking System</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f8f9fa;color:#1a1a1a;min-height:100vh}
+.app{max-width:1000px;margin:0 auto;padding:1.5rem 1rem}
+h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:center;gap:8px}
+.tabs{display:flex;gap:8px;margin-bottom:1.5rem;border-bottom:1px solid #e0e0e0;padding-bottom:0}
+.tab{padding:8px 16px;cursor:pointer;font-size:14px;border:none;background:none;color:#666;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.active{color:#1a1a1a;border-bottom-color:#1a1a1a;font-weight:500}
+.week-nav{display:flex;align-items:center;gap:12px;margin-bottom:1rem}
+.week-nav button{background:#fff;border:1px solid #ddd;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px}
+.week-nav button:hover{background:#f0f0f0}
+.week-label{font-size:14px;font-weight:500;flex:1;text-align:center}
+.stats-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:1rem}
+.stat{background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:8px;text-align:center}
+.stat-num{font-size:16px;font-weight:500}
+.stat-label{font-size:11px;color:#888;margin-top:2px}
+.stat.today{border-color:#378ADD}
+.legend{display:flex;gap:12px;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:12px;color:#666}
+.legend-dot{width:12px;height:12px;border-radius:3px}
+.window-legend{width:24px;height:5px;background:#a8d8f0;border-radius:2px}
+.pano-legend{width:14px;height:14px;border-radius:3px;background:#ececec;border:1px solid #d0d0d0;position:relative}
+.pano-legend::before{content:"";position:absolute;top:2px;right:2px;width:7px;height:5px;border:1.2px solid #185FA5;border-radius:1px;background:rgba(55,138,221,0.25)}
+.day-scroll{overflow-x:auto}
+.day-cols{display:grid;grid-template-columns:120px repeat(5,1fr);min-width:640px;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;background:#fff}
+.day-header{padding:8px 6px;text-align:center;font-size:12px;font-weight:500;background:#f5f5f5;border-bottom:1px solid #e0e0e0;color:#555}
+.day-header.today{color:#185FA5;background:#E6F1FB}
+.room-label{padding:8px 10px;font-size:12px;font-weight:500;background:#fafafa;border-right:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;gap:6px;color:#555}
+.cell{border-bottom:1px solid #e0e0e0;border-right:1px solid #e0e0e0;padding:6px;display:flex;align-items:center;justify-content:center;min-height:88px}
+.cell:last-child{border-right:none}
+
+/* Office layout */
+.office-box{position:relative;width:80px;height:80px}
+.win{position:absolute;background:#a8d8f0;border-radius:2px;z-index:1}
+.win.top{top:0;left:15%;width:70%;height:4px}
+.win.bottom{bottom:0;left:15%;width:70%;height:4px}
+.win.left{left:0;top:15%;height:70%;width:4px}
+.win.right{right:0;top:15%;height:70%;width:4px}
+.desks{position:absolute;inset:7px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:4px}
+.desk{position:relative;border-radius:5px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:8px;font-weight:700;border:1.5px solid transparent;transition:opacity 0.15s;line-height:1.1;overflow:hidden}
+.desk-free{background:#ececec;border-color:#d0d0d0;color:#aaa}
+.desk-free:hover{background:#dbeeff;border-color:#378ADD}
+.desk-taken{cursor:pointer}
+.desk-taken:hover{opacity:0.72}
+.desk-phantom{visibility:hidden}
+.desk-note{font-size:6.5px;font-weight:500;opacity:0.85;margin-top:1px}
+.pano-icon{position:absolute;top:2px;right:2px;width:10px;height:7px;border:1.3px solid #185FA5;border-radius:1.5px;background:rgba(55,138,221,0.25)}
+.pano-icon::after{content:"";position:absolute;left:50%;bottom:-3px;transform:translateX(-50%);width:5px;height:1.3px;background:#185FA5}
+.desk-taken .pano-icon{border-color:currentColor;background:rgba(255,255,255,0.35)}
+.desk-taken .pano-icon::after{background:currentColor}
+.day-header.past{color:#bbb;background:#f9f9f9}
+.cell-past{background:#fafafa}
+.cell-past .office-box .win{background:#d8d8d8}
+
+/* Absence calendar */
+.absence-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.absence-day{background:#fff;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;min-height:220px}
+.absence-day-header{padding:8px 6px;text-align:center;font-size:12px;font-weight:500;background:#f5f5f5;border-bottom:1px solid #e0e0e0;color:#555}
+.absence-day-header.today{color:#185FA5;background:#E6F1FB}
+.absence-list{flex:1;padding:6px;display:flex;flex-direction:column;gap:5px}
+.absence-entry{display:flex;align-items:center;gap:5px;padding:5px 7px;border-radius:7px;font-size:11px;cursor:pointer;font-weight:500}
+.absence-entry:hover{opacity:0.75}
+.absence-entry i{font-size:11px}
+.absence-add{margin:6px;padding:6px;border:1px dashed #ccc;border-radius:7px;background:none;cursor:pointer;font-size:12px;color:#888;display:flex;align-items:center;justify-content:center;gap:4px}
+.absence-add:hover{background:#f5f5f5;color:#555}
+.type-select{display:flex;gap:6px;margin-bottom:10px}
+.type-opt{flex:1;padding:8px 4px;border:1.5px solid #ddd;border-radius:8px;font-size:11px;text-align:center;cursor:pointer;color:#666;display:flex;flex-direction:column;align-items:center;gap:3px}
+.type-opt i{font-size:15px}
+.type-opt.selected{border-color:#185FA5;background:#E6F1FB;color:#0C447C;font-weight:600}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:#fff;border-radius:12px;padding:1.5rem;width:300px;box-shadow:0 8px 32px rgba(0,0,0,0.12)}
+.modal h3{font-size:15px;font-weight:500;margin-bottom:1rem}
+.modal input{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:10px}
+.modal input:focus{outline:none;border-color:#378ADD}
+.modal label.field-label{display:block;font-size:11px;color:#888;margin-bottom:4px;margin-top:-4px}
+.modal-btns{display:flex;gap:8px}
+.btn-primary{flex:1;padding:8px;background:#185FA5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px}
+.btn-primary:hover{background:#0C447C}
+.btn-secondary{flex:1;padding:8px;background:#fff;border:1px solid #ddd;border-radius:8px;cursor:pointer;font-size:13px}
+.btn-danger{flex:1;padding:8px;background:#A32D2D;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px}
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:200;opacity:0;transition:opacity 0.3s;pointer-events:none}
+.toast.show{opacity:1}
+.loading{text-align:center;padding:2rem;color:#888;font-size:14px;grid-column:1/-1}
+.cleaning-banner{display:flex;align-items:center;gap:10px;background:#FFFAE6;border:1px solid #FAC775;border-radius:8px;padding:9px 14px;margin-bottom:1rem;font-size:13px;color:#633806}
+.cleaning-banner strong{font-weight:600}
+.cleaning-banner .week-tag{color:#999;font-size:12px;margin-left:auto;white-space:nowrap}
+.cleaning-banner.hidden{display:none}
+.congrats-modal{background:#fff;border-radius:12px;padding:1.5rem;width:300px;box-shadow:0 8px 32px rgba(0,0,0,0.18);text-align:center}
+.congrats-modal .emoji{font-size:36px;margin-bottom:8px}
+.congrats-modal h3{font-size:15px;font-weight:600;margin-bottom:6px}
+.congrats-modal p{font-size:13px;color:#666;margin-bottom:1rem;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1><i class="ti ti-building-office" aria-hidden="true"></i> Office Booking System</h1>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('desks',this)"><i class="ti ti-armchair" aria-hidden="true"></i> Desks</button>
+    <button class="tab" onclick="switchTab('abs',this)"><i class="ti ti-calendar-time" aria-hidden="true"></i> Absences</button>
+  </div>
+
+  <div id="tab-desks">
+    <div class="week-nav">
+      <button onclick="changeWeek(-1)"><i class="ti ti-chevron-left"></i></button>
+      <span class="week-label" id="week-label"></span>
+      <button onclick="changeWeek(1)"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <div class="stats-bar" id="stats-bar"></div>
+    <div class="cleaning-banner hidden" id="cleaning-banner">🍽 <span id="cleaning-text"></span><span class="week-tag" id="cleaning-week-tag"></span></div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#ececec;border:1px solid #ccc"></div>Free</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#9FE1CB"></div>Office 1</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#B5D4F4"></div>Office 2</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#FAC775"></div>Office 3</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#F4C0D1"></div>Office 4</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#C0DD97"></div>Office 5</div>
+      <div class="legend-item"><div class="window-legend"></div>Window</div>
+      <div class="legend-item"><div class="pano-legend"></div>Panorama screen</div>
+    </div>
+    <div class="day-scroll"><div class="day-cols" id="desk-grid"></div></div>
+  </div>
+
+  <div id="tab-abs" style="display:none">
+    <div class="week-nav">
+      <button onclick="changeWeek(-1)"><i class="ti ti-chevron-left"></i></button>
+      <span class="week-label" id="week-label-abs"></span>
+      <button onclick="changeWeek(1)"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <div class="absence-grid" id="absence-grid"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="congrats-modal-bg" style="display:none">
+  <div class="congrats-modal">
+    <div class="emoji">🍽</div>
+    <h3>Kitchen duty week!</h3>
+    <p id="congrats-text"></p>
+    <button class="btn-primary" onclick="closeCongrats()" style="width:100%">Got it!</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal" style="display:none" onclick="bgClose(event)">
+  <div class="modal">
+    <h3 id="modal-title">Book desk</h3>
+    <input type="text" id="modal-name" placeholder="Your name" maxlength="30" />
+    <label class="field-label" id="modal-note-label" style="display:none">Time you'll be there (optional, e.g. 9-12)</label>
+    <input type="text" id="modal-note" placeholder="e.g. 9:00 - 12:00" maxlength="30" style="display:none" />
+    <div id="modal-type-wrap" style="display:none">
+      <label class="field-label">Type</label>
+      <div class="type-select" id="type-select"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" id="btn-book" onclick="confirmBook()">Book</button>
+      <button class="btn-danger" id="btn-cancel" style="display:none" onclick="cancelBook()">Remove</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// Desk order: [top-left, top-right, bottom-left, bottom-right]
+// panorama: index of the desk in each office that has a panoramic screen (null = none)
+const ROOMS=[
+  {name:"Office 1",desks:4,color:"#9FE1CB",tc:"#085041",window:"top",panorama:[2,3]},
+  {name:"Office 2",desks:4,color:"#B5D4F4",tc:"#0C447C",window:"top",panorama:[2,3]},
+  {name:"Office 3",desks:4,color:"#FAC775",tc:"#633806",window:"top",panorama:[3]},
+  {name:"Office 4",desks:4,color:"#F4C0D1",tc:"#72243E",window:"top",panorama:[1,3]},
+  {name:"Office 5",desks:3,color:"#C0DD97",tc:"#27500A",window:"top",panorama:[]}
+];
+const DAYS=["Mon","Tue","Wed","Thu","Fri"];
+const ABSENCE_TYPES=[
+  {key:"vacation",label:"Vacation",color:"#FAC775",tc:"#633806",icon:"ti-beach"},
+  {key:"conference",label:"Conference",color:"#B5D4F4",tc:"#0C447C",icon:"ti-presentation"},
+  {key:"other",label:"Other",color:"#ececec",tc:"#555",icon:"ti-dots"}
+];
+// Cleaning rota — starts Mon July 6, 2026; 8-week cycle
+const CLEANING_START=new Date('2026-07-06');
+const CLEANING_ROTA=[
+  ['Clara','Frieder','Marius'],
+  ['Jannik','Mika'],
+  ['Doro','Jana'],
+  ['Nino','Tomás'],
+  ['Nelly','Ana'],
+  ['Kiwoong','Max'],
+  ['Vera','Natalie'],
+  ['Maria','Martin'],
+];
+function getCleaningTeam(mon){
+  const diff=Math.round((mon-CLEANING_START)/(7*24*60*60*1000));
+  if(diff<0)return null;
+  const idx=diff%CLEANING_ROTA.length;
+  return{weekNum:diff+1,team:CLEANING_ROTA[idx]};
+}
+function nameMatchesCleaning(name,team){
+  const n=name.toLowerCase();
+  return team.some(m=>{
+    const mn=m.toLowerCase();
+    return n.startsWith(mn)||mn.startsWith(n);
+  });
+}
+
+let weekOffset=0,bookings={},absences=[],pending=null,currentTab='desks',selectedType='vacation';
+const congratsShown=new Set();
+const API_URL='https://script.google.com/macros/s/AKfycbzBCMFsfXLrL2SGKqMpiPLcLfeosfkq4hczsYRFfd37sSH34zxbY52rVRVK6o94Wr6DmQ/exec';
+loadBookings();
+
+async function loadBookings(){
+  try{
+    const r=await fetch(API_URL+'?action=getAll');
+    const d=await r.json();
+    bookings={};
+    (d.bookings||[]).forEach(b=>bookings[b.key]={name:b.name,note:b.note||''});
+    absences=(d.absences||[]).map(a=>({key:a.key,name:a.name,type:a.type||'other',date:a.date}));
+    renderDesks();
+    if(currentTab==='abs')renderAbsences();
+  }catch(e){toast('Could not connect – working offline');renderDesks();}
+}
+
+async function apiWrite(action,key,name,note,date){
+  try{
+    let url=`${API_URL}?action=${action}&key=${encodeURIComponent(key)}&name=${encodeURIComponent(name||'')}`;
+    if(note!==undefined)url+=`&note=${encodeURIComponent(note||'')}`;
+    if(date!==undefined)url+=`&date=${encodeURIComponent(date||'')}`;
+    const r=await fetch(url);
+    const text=await r.text();
+    console.log('apiWrite response:',text);
+    if(!r.ok || /error/i.test(text)){
+      toast('Save may have failed – check console');
+      console.error('Apps Script response indicates a problem:',text);
+    }
+  }catch(e){
+    toast('Could not save – see console for details');
+    console.error('apiWrite failed:',e);
+  }
+}
+
+function getMonday(offset){
+  const d=new Date();d.setHours(0,0,0,0);
+  const day=d.getDay();
+  // On weekend (Sat=6, Sun=0), start on next week
+  const weekendOffset=(day===6||day===0)?1:0;
+  d.setDate(d.getDate()+(day===0?-6:day===6?-5:1-day)+(offset+weekendOffset)*7);
+  return d;
+}
+function dateKey(base,i){
+  const d=new Date(base);d.setDate(d.getDate()+i);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function formatWeek(mon){
+  const fri=new Date(mon);fri.setDate(fri.getDate()+4);
+  const f=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'});
+  return f(mon)+" – "+f(fri)+" "+fri.getFullYear();
+}
+function isToday(base,i){
+  const d=new Date(base);d.setDate(d.getDate()+i);
+  return d.toDateString()===new Date().toDateString();
+}
+function isPast(base,i){
+  const d=new Date(base);d.setDate(d.getDate()+i);
+  const today=new Date();today.setHours(0,0,0,0);
+  return d<today;
+}
+function isAllowed(o){return o===0||o===1;}
+
+function renderOffice(room,ri,dk,past){
+  const slots = room.desks===4 ? [0,1,2,3] : [0,1,2,'x'];
+  let desksHtml='';
+  slots.forEach(deskIdx=>{
+    if(deskIdx==='x'){desksHtml+=`<div class="desk desk-phantom"></div>`;return;}
+    const bk=`${dk}_r${ri}_d${deskIdx}`;
+    const b=bookings[bk];
+    const isPano=room.panorama.includes(deskIdx);
+    const panoIcon=isPano?'<i class="ti ti-device-desktop pano-icon"></i>':'';
+    if(b){
+      const style=past?'background:#d0d0d0;color:#999;border-color:#d0d0d0':`background:${room.color};color:${room.tc};border-color:${room.color}`;
+      const noteHtml=b.note?`<div class="desk-note">${escapeHtml(b.note)}</div>`:'';
+      const titleNote=b.note?` (${b.note})`:'';
+      desksHtml+=`<div class="desk desk-taken" style="${style}" title="${escapeHtml(b.name)}${titleNote}${past?'':' – click to remove'}" ${past?'':`onclick="openCancel('${bk}','${escapeAttr(b.name)}','${escapeAttr(b.note||'')}','${room.name} Desk ${deskIdx+1}')"`}>${panoIcon}<span>${b.name.slice(0,2).toUpperCase()}</span>${noteHtml}</div>`;
+    }else{
+      desksHtml+=`<div class="desk${past?' desk-phantom':' desk-free'}" ${past?'':`title="Free – click to book${isPano?' (panorama screen)':''}" onclick="openBook('${bk}','${room.name} Desk ${deskIdx+1}')"`}>${panoIcon}</div>`;
+    }
+  });
+  return `<div class="office-box"><div class="win ${room.window}"></div><div class="desks">${desksHtml}</div></div>`;
+}
+
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escapeAttr(s){return (s||'').replace(/'/g,"\\'");}
+
+function renderDesks(){
+  const mon=getMonday(weekOffset);
+  document.getElementById('week-label').textContent=formatWeek(mon);
+  if(!isAllowed(weekOffset)){
+    document.getElementById('desk-grid').innerHTML='<div class="loading">Desk bookings are only available for this week and next week.</div>';
+    document.getElementById('stats-bar').innerHTML='';
+    return;
+  }
+  let h='<div class="day-header"></div>';
+  DAYS.forEach((d,i)=>{
+    const t=isToday(mon,i);
+    const p=isPast(mon,i);
+    h+=`<div class="day-header${t?' today':p?' past':''}">${d}<br><span style="font-size:10px">${new Date(dateKey(mon,i)).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'})}</span></div>`;
+  });
+  ROOMS.forEach((room,ri)=>{
+    h+=`<div class="room-label"><span style="width:8px;height:8px;border-radius:50%;background:${room.color};display:inline-block;flex-shrink:0"></span>${room.name}</div>`;
+    DAYS.forEach((_,di)=>{
+      const dk=dateKey(mon,di);
+      const p=isPast(mon,di);
+      h+=`<div class="cell${p?' cell-past':''}">${renderOffice(room,ri,dk,p)}</div>`;
+    });
+  });
+  document.getElementById('desk-grid').innerHTML=h;
+
+  // Cleaning banner
+  const ct=getCleaningTeam(mon);
+  const banner=document.getElementById('cleaning-banner');
+  if(ct){
+    document.getElementById('cleaning-text').innerHTML=`This week's kitchen team: <strong>${ct.team.join(', ')}</strong>`;
+    document.getElementById('cleaning-week-tag').textContent=`Week ${ct.weekNum}`;
+    banner.classList.remove('hidden');
+  }else{
+    banner.classList.add('hidden');
+  }
+
+  let sh='';
+  DAYS.forEach((d,di)=>{
+    const dk=dateKey(mon,di);
+    let total=0,booked=0;
+    ROOMS.forEach((room,ri)=>{
+      total+=room.desks;
+      for(let desk=0;desk<room.desks;desk++){if(bookings[`${dk}_r${ri}_d${desk}`])booked++;}
+    });
+    sh+=`<div class="stat${isToday(mon,di)?' today':''}"><div class="stat-num">${booked}/${total}</div><div class="stat-label">${d}${isToday(mon,di)?' · today':''}</div></div>`;
+  });
+  document.getElementById('stats-bar').innerHTML=sh;
+}
+
+function renderAbsences(){
+  const mon=getMonday(weekOffset);
+  document.getElementById('week-label-abs').textContent=formatWeek(mon);
+  let h='';
+  DAYS.forEach((d,di)=>{
+    const dk=dateKey(mon,di);
+    const t=isToday(mon,di);
+    const entries=absences.filter(a=>a.date===dk);
+    let listHtml='';
+    entries.forEach(a=>{
+      const type=ABSENCE_TYPES.find(t=>t.key===a.type)||ABSENCE_TYPES[2];
+      listHtml+=`<div class="absence-entry" style="background:${type.color};color:${type.tc}" onclick="openCancelAbsence('${a.key}','${escapeAttr(a.name)}','${type.key}')" title="Click to remove"><i class="ti ${type.icon}"></i><span>${escapeHtml(a.name)}</span></div>`;
+    });
+    h+=`<div class="absence-day">
+      <div class="absence-day-header${t?' today':''}">${d}<br><span style="font-size:10px">${new Date(dk).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'})}</span></div>
+      <div class="absence-list">${listHtml}</div>
+      <button class="absence-add" onclick="openAddAbsence('${dk}')"><i class="ti ti-plus"></i> Add</button>
+    </div>`;
+  });
+  document.getElementById('absence-grid').innerHTML=h;
+}
+
+function switchTab(t,el){
+  currentTab=t;
+  document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-desks').style.display=t==='desks'?'':'none';
+  document.getElementById('tab-abs').style.display=t==='abs'?'':'none';
+  if(t==='abs')renderAbsences();
+}
+function changeWeek(d){
+  const next=weekOffset+d;
+  if(currentTab==='desks'&&(next<0||next>1)){toast('Only current and next week are available for desk booking');return;}
+  weekOffset=next;
+  renderDesks();
+  if(currentTab==='abs')renderAbsences();
+}
+function openBook(key,label){
+  pending={type:'book',key,label};
+  document.getElementById('modal-title').textContent='Book: '+label;
+  document.getElementById('modal-name').value='';
+  document.getElementById('modal-note').value='';
+  document.getElementById('modal-note').style.display='';
+  document.getElementById('modal-note-label').style.display='';
+  document.getElementById('modal-type-wrap').style.display='none';
+  document.getElementById('btn-book').style.display='';
+  document.getElementById('btn-cancel').style.display='none';
+  document.getElementById('modal').style.display='flex';
+  setTimeout(()=>document.getElementById('modal-name').focus(),50);
+}
+function openCancel(key,name,note,label){
+  pending={type:'cancel',key,name,label};
+  document.getElementById('modal-title').textContent=`${label} – booked by ${name}${note?' ('+note+')':''}`;
+  document.getElementById('modal-name').value=name;
+  document.getElementById('modal-note').value=note||'';
+  document.getElementById('modal-note').style.display='';
+  document.getElementById('modal-note-label').style.display='';
+  document.getElementById('modal-type-wrap').style.display='none';
+  document.getElementById('btn-book').style.display='none';
+  document.getElementById('btn-cancel').style.display='';
+  document.getElementById('modal').style.display='flex';
+}
+function renderTypeSelect(){
+  let h='';
+  ABSENCE_TYPES.forEach(t=>{
+    h+=`<div class="type-opt${selectedType===t.key?' selected':''}" onclick="selectType('${t.key}')"><i class="ti ${t.icon}"></i>${t.label}</div>`;
+  });
+  document.getElementById('type-select').innerHTML=h;
+}
+function selectType(k){selectedType=k;renderTypeSelect();}
+function openAddAbsence(date){
+  selectedType='vacation';
+  pending={type:'addAbsence',date};
+  document.getElementById('modal-title').textContent='Add absence – '+new Date(date).toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'2-digit'});
+  document.getElementById('modal-name').value='';
+  document.getElementById('modal-note').style.display='none';
+  document.getElementById('modal-note-label').style.display='none';
+  document.getElementById('modal-type-wrap').style.display='';
+  renderTypeSelect();
+  document.getElementById('btn-book').style.display='';
+  document.getElementById('btn-cancel').style.display='none';
+  document.getElementById('modal').style.display='flex';
+  setTimeout(()=>document.getElementById('modal-name').focus(),50);
+}
+function openCancelAbsence(key,name,type){
+  const t=ABSENCE_TYPES.find(x=>x.key===type)||ABSENCE_TYPES[2];
+  pending={type:'cancelAbsence',key,name};
+  document.getElementById('modal-title').textContent=`${t.label} – ${name}`;
+  document.getElementById('modal-name').value=name;
+  document.getElementById('modal-note').style.display='none';
+  document.getElementById('modal-note-label').style.display='none';
+  document.getElementById('modal-type-wrap').style.display='none';
+  document.getElementById('btn-book').style.display='none';
+  document.getElementById('btn-cancel').style.display='';
+  document.getElementById('modal').style.display='flex';
+}
+function closeModal(){document.getElementById('modal').style.display='none';pending=null;}
+function bgClose(e){if(e.target===document.getElementById('modal'))closeModal();}
+async function confirmBook(){
+  const name=document.getElementById('modal-name').value.trim();
+  if(!name){toast('Please enter your name');return;}
+  if(pending.type==='book'){
+    const note=document.getElementById('modal-note').value.trim();
+    bookings[pending.key]={name,note};
+    await apiWrite('book',pending.key,name,note);
+    renderDesks();
+    // Check cleaning rota
+    const mon=getMonday(weekOffset);
+    const ct=getCleaningTeam(mon);
+    if(ct&&nameMatchesCleaning(name,ct.team)&&!congratsShown.has(name.toLowerCase())){
+      congratsShown.add(name.toLowerCase());
+      closeModal();
+      showCongrats(name,ct.team);
+      return;
+    }
+    toast('Desk booked!');
+  }else if(pending.type==='addAbsence'){
+    const key='abs_'+pending.date+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    absences.push({key,name,type:selectedType,date:pending.date});
+    await apiWrite('book',key,name,selectedType,pending.date);
+    renderAbsences();toast('Absence added');
+  }
+  closeModal();
+}
+function showCongrats(name,team){
+  document.getElementById('congrats-text').textContent=`Congrats, ${name}! You've been selected for kitchen duties this week together with ${team.filter(m=>!nameMatchesCleaning(name,[m])||team.length===1?true:false).join(', ')}.`;
+  // Simpler: just show the whole team
+  document.getElementById('congrats-text').textContent=`Congrats, ${name}! You've been selected for kitchen duties this week. Your team: ${team.join(', ')}.`;
+  document.getElementById('congrats-modal-bg').style.display='flex';
+}
+function closeCongrats(){
+  document.getElementById('congrats-modal-bg').style.display='none';
+  toast('Desk booked!');
+}
+async function cancelBook(){
+  if(pending.type==='cancel'){
+    delete bookings[pending.key];
+    await apiWrite('cancel',pending.key,'');
+    renderDesks();toast('Booking removed');
+  }else if(pending.type==='cancelAbsence'){
+    absences=absences.filter(a=>a.key!==pending.key);
+    await apiWrite('cancel',pending.key,'');
+    renderAbsences();toast('Absence removed');
+  }
+  closeModal();
+}
+document.getElementById('modal-name').addEventListener('keydown',e=>{if(e.key==='Enter')confirmBook();});
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+</script>
+</body>
+</html>
+
