@@ -158,6 +158,10 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
     <div id="modal-type-wrap" style="display:none">
       <label class="field-label">Type</label>
       <div class="type-select" id="type-select"></div>
+      <label class="field-label" style="margin-top:6px">From</label>
+      <input type="date" id="modal-date-from" style="margin-bottom:6px" />
+      <label class="field-label">To (optional, for multi-day)</label>
+      <input type="date" id="modal-date-to" />
     </div>
     <div class="modal-btns">
       <button class="btn-secondary" onclick="closeModal()">Cancel</button>
@@ -181,7 +185,7 @@ const ROOMS=[
 const DAYS=["Mon","Tue","Wed","Thu","Fri"];
 const ABSENCE_TYPES=[
   {key:"vacation",label:"Vacation",color:"#FAC775",tc:"#633806",icon:"ti-beach"},
-  {key:"conference",label:"Conference",color:"#B5D4F4",tc:"#0C447C",icon:"ti-presentation"},
+  {key:"work",label:"Work Trip",color:"#B5D4F4",tc:"#0C447C",icon:"ti-briefcase"},
   {key:"other",label:"Other",color:"#ececec",tc:"#555",icon:"ti-dots"}
 ];
 // Cleaning rota — starts Mon July 6, 2026; 8-week cycle
@@ -369,10 +373,12 @@ function renderAbsences(){
 
 function switchTab(t,el){
   currentTab=t;
+  weekOffset=0;
   document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('tab-desks').style.display=t==='desks'?'':'none';
   document.getElementById('tab-abs').style.display=t==='abs'?'':'none';
+  if(t==='desks')renderDesks();
   if(t==='abs')renderAbsences();
 }
 function changeWeek(d){
@@ -417,12 +423,14 @@ function renderTypeSelect(){
 function selectType(k){selectedType=k;renderTypeSelect();}
 function openAddAbsence(date){
   selectedType='vacation';
-  pending={type:'addAbsence',date};
-  document.getElementById('modal-title').textContent='Add absence – '+new Date(date).toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'2-digit'});
+  pending={type:'addAbsence'};
+  document.getElementById('modal-title').textContent='Add absence';
   document.getElementById('modal-name').value='';
   document.getElementById('modal-note').style.display='none';
   document.getElementById('modal-note-label').style.display='none';
   document.getElementById('modal-type-wrap').style.display='';
+  document.getElementById('modal-date-from').value=date;
+  document.getElementById('modal-date-to').value='';
   renderTypeSelect();
   document.getElementById('btn-book').style.display='';
   document.getElementById('btn-cancel').style.display='none';
@@ -462,10 +470,26 @@ async function confirmBook(){
     }
     toast('Desk booked!');
   }else if(pending.type==='addAbsence'){
-    const key='abs_'+pending.date+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-    absences.push({key,name,type:selectedType,date:pending.date});
-    await apiWrite('book',key,name,selectedType,pending.date);
-    renderAbsences();toast('Absence added');
+    const fromStr=document.getElementById('modal-date-from').value;
+    const toStr=document.getElementById('modal-date-to').value||fromStr;
+    if(!fromStr){toast('Please select a start date');return;}
+    const from=new Date(fromStr);
+    const to=new Date(toStr);
+    if(to<from){toast('End date must be after start date');return;}
+    const dates=[];
+    for(let d=new Date(from);d<=to;d.setDate(d.getDate()+1)){
+      const dow=d.getDay();
+      if(dow!==0&&dow!==6){ // skip weekends
+        dates.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+      }
+    }
+    for(const date of dates){
+      const key='abs_'+date+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+      absences.push({key,name,type:selectedType,date});
+      await apiWrite('book',key,name,selectedType,date);
+    }
+    renderAbsences();
+    toast(dates.length>1?`Absence added for ${dates.length} days`:'Absence added');
   }
   closeModal();
 }
@@ -500,4 +524,3 @@ function toast(msg){
 </script>
 </body>
 </html>
-
