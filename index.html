@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"> 
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Office Booking System</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -225,7 +225,15 @@ async function loadBookings(){
     const d=await r.json();
     bookings={};
     (d.bookings||[]).forEach(b=>bookings[b.key]={name:b.name,note:b.note||''});
-    absences=(d.absences||[]).map(a=>({key:a.key,name:a.name,type:a.type||'other',date:a.date}));
+    absences=(d.absences||[]).map(a=>{
+      let date=a.date||'';
+      if(date.length>10){
+        // Timestamp like "2026-07-01T22:00:00.000Z" — parse in local time to get correct date
+        const dt=new Date(date);
+        date=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+      }
+      return{key:a.key,name:a.name,type:a.type||'other',date};
+    });
     renderDesks();
     if(currentTab==='abs')renderAbsences();
   }catch(e){toast('Could not connect – working offline');renderDesks();}
@@ -454,44 +462,52 @@ function bgClose(e){if(e.target===document.getElementById('modal'))closeModal();
 async function confirmBook(){
   const name=document.getElementById('modal-name').value.trim();
   if(!name){toast('Please enter your name');return;}
-  if(pending.type==='book'){
-    const note=document.getElementById('modal-note').value.trim();
-    bookings[pending.key]={name,note};
-    await apiWrite('book',pending.key,name,note);
-    renderDesks();
-    // Check cleaning rota
-    const mon=getMonday(weekOffset);
-    const ct=getCleaningTeam(mon);
-    if(ct&&nameMatchesCleaning(name,ct.team)&&!congratsShown.has(name.toLowerCase())){
-      congratsShown.add(name.toLowerCase());
-      closeModal();
-      showCongrats(name,ct.team);
-      return;
-    }
-    toast('Desk booked!');
-  }else if(pending.type==='addAbsence'){
-    const fromStr=document.getElementById('modal-date-from').value;
-    const toStr=document.getElementById('modal-date-to').value||fromStr;
-    if(!fromStr){toast('Please select a start date');return;}
-    const from=new Date(fromStr);
-    const to=new Date(toStr);
-    if(to<from){toast('End date must be after start date');return;}
-    const dates=[];
-    for(let d=new Date(from);d<=to;d.setDate(d.getDate()+1)){
-      const dow=d.getDay();
-      if(dow!==0&&dow!==6){ // skip weekends
-        dates.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+  const btnBook=document.getElementById('btn-book');
+  btnBook.disabled=true;
+  btnBook.textContent='Saving…';
+  try{
+    if(pending.type==='book'){
+      const note=document.getElementById('modal-note').value.trim();
+      bookings[pending.key]={name,note};
+      await apiWrite('book',pending.key,name,note);
+      renderDesks();
+      const mon=getMonday(weekOffset);
+      const ct=getCleaningTeam(mon);
+      if(ct&&nameMatchesCleaning(name,ct.team)&&!congratsShown.has(name.toLowerCase())){
+        congratsShown.add(name.toLowerCase());
+        closeModal();
+        showCongrats(name,ct.team);
+        return;
       }
+      toast('Desk booked!');
+    }else if(pending.type==='addAbsence'){
+      const fromStr=document.getElementById('modal-date-from').value;
+      const toStr=document.getElementById('modal-date-to').value||fromStr;
+      if(!fromStr){toast('Please select a start date');return;}
+      const from=new Date(fromStr);
+      const to=new Date(toStr);
+      if(to<from){toast('End date must be after start date');return;}
+      const dates=[];
+      for(let d=new Date(from);d<=to;d.setDate(d.getDate()+1)){
+        const dow=d.getDay();
+        if(dow!==0&&dow!==6)dates.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+      }
+      for(const date of dates){
+        const key='abs_'+date+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+        absences.push({key,name,type:selectedType,date});
+        await apiWrite('book',key,name,selectedType,date);
+      }
+      renderAbsences();
+      toast(dates.length>1?`Absence added for ${dates.length} days`:'Absence added');
     }
-    for(const date of dates){
-      const key='abs_'+date+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-      absences.push({key,name,type:selectedType,date});
-      await apiWrite('book',key,name,selectedType,date);
-    }
-    renderAbsences();
-    toast(dates.length>1?`Absence added for ${dates.length} days`:'Absence added');
+    closeModal();
+  }catch(err){
+    console.error('confirmBook error:',err);
+    toast('Something went wrong – please try again');
+  }finally{
+    btnBook.disabled=false;
+    btnBook.textContent='Book';
   }
-  closeModal();
 }
 function showCongrats(name,team){
   document.getElementById('congrats-text').textContent=`Congrats, ${name}! You've been selected for kitchen duties this week together with ${team.filter(m=>!nameMatchesCleaning(name,[m])||team.length===1?true:false).join(', ')}.`;
