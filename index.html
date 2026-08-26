@@ -188,9 +188,9 @@ const ABSENCE_TYPES=[
   {key:"work",label:"Work Trip",color:"#B5D4F4",tc:"#0C447C",icon:"ti-briefcase"},
   {key:"other",label:"Other",color:"#ececec",tc:"#555",icon:"ti-dots"}
 ];
-// Cleaning rota — starts Mon July 6, 2026; 8-week cycle
-const CLEANING_START=new Date('2026-07-06');
-const CLEANING_ROTA=[
+// Cleaning rota 1 — starts Mon July 6, 2026; 8-week cycle
+const CLEANING_START_1=new Date('2026-07-06');
+const CLEANING_ROTA_1=[
   ['Clara','Frieder','Marius'],
   ['Jannik','Mika'],
   ['Doro','Jana'],
@@ -200,11 +200,26 @@ const CLEANING_ROTA=[
   ['Vera','Natalie'],
   ['Maria','Martin'],
 ];
+// Cleaning rota 2 — starts Mon Aug 31, 2026 (week of Sep 1); 9-week cycle
+const CLEANING_START_2=new Date('2026-08-31');
+const CLEANING_ROTA_2=[
+  ['Frieder','Marius','Marlin','Lennart'],
+  ['Clara','Anna','Martje','Elzina'],
+  ['Jannik','Mika','Louis'],
+  ['Doro','Jana','Mara'],
+  ['Nino','Tomas','Josh'],
+  ['Nelly','Tessa','Aurelia','Marcela'],
+  ['Kiwoong','Max','Sven'],
+  ['Natalie','Jennifer','Amelie'],
+  ['Maria','Martin','Ana'],
+];
 function getCleaningTeam(mon){
-  const diff=Math.round((mon-CLEANING_START)/(7*24*60*60*1000));
+  const useRota2=mon>=CLEANING_START_2;
+  const start=useRota2?CLEANING_START_2:CLEANING_START_1;
+  const rota=useRota2?CLEANING_ROTA_2:CLEANING_ROTA_1;
+  const diff=Math.round((mon-start)/(7*24*60*60*1000));
   if(diff<0)return null;
-  const idx=diff%CLEANING_ROTA.length;
-  return{weekNum:diff+1,team:CLEANING_ROTA[idx]};
+  return{weekNum:diff+1,team:rota[diff%rota.length]};
 }
 function nameMatchesCleaning(name,team){
   const n=name.toLowerCase();
