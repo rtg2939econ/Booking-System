@@ -70,6 +70,10 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
 .absence-entry i{font-size:11px}
 .absence-add{margin:6px;padding:6px;border:1px dashed #ccc;border-radius:7px;background:none;cursor:pointer;font-size:12px;color:#888;display:flex;align-items:center;justify-content:center;gap:4px}
 .absence-add:hover{background:#f5f5f5;color:#555}
+.birthday-entry{display:flex;align-items:center;gap:5px;padding:5px 7px;border-radius:7px;font-size:11px;font-weight:500;background:#F3E8FF;color:#6B21A8;cursor:pointer}
+.birthday-entry:hover{opacity:0.75}
+.birthday-add-btn{display:flex;align-items:center;gap:6px;margin:8px 0 0;padding:7px 12px;background:#F3E8FF;border:1px solid #D8B4FE;border-radius:8px;color:#7C3AED;font-size:13px;cursor:pointer}
+.birthday-add-btn:hover{background:#EDE9FE}
 .type-select{display:flex;gap:6px;margin-bottom:10px}
 .type-opt{flex:1;padding:8px 4px;border:1.5px solid #ddd;border-radius:8px;font-size:11px;text-align:center;cursor:pointer;color:#666;display:flex;flex-direction:column;align-items:center;gap:3px}
 .type-opt i{font-size:15px}
@@ -79,8 +83,8 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100}
 .modal{background:#fff;border-radius:12px;padding:1.5rem;width:300px;box-shadow:0 8px 32px rgba(0,0,0,0.12)}
 .modal h3{font-size:15px;font-weight:500;margin-bottom:1rem}
-.modal input{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:10px}
-.modal input:focus{outline:none;border-color:#378ADD}
+.modal input,.modal select{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:10px;background:#fff}
+.modal input:focus,.modal select:focus{outline:none;border-color:#378ADD}
 .modal label.field-label{display:block;font-size:11px;color:#888;margin-bottom:4px;margin-top:-4px}
 .modal-btns{display:flex;gap:8px}
 .btn-primary{flex:1;padding:8px;background:#185FA5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px}
@@ -137,6 +141,9 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
       <button onclick="changeWeek(1)"><i class="ti ti-chevron-right"></i></button>
     </div>
     <div class="absence-grid" id="absence-grid"></div>
+    <div style="margin-top:1rem;display:flex;justify-content:flex-end">
+      <button class="birthday-add-btn" onclick="openAddBirthday()">🎂 Add my birthday</button>
+    </div>
   </div>
 </div>
 
@@ -163,6 +170,12 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
       <label class="field-label">To (optional, for multi-day)</label>
       <input type="date" id="modal-date-to" />
     </div>
+    <div id="modal-birthday-wrap" style="display:none">
+      <label class="field-label">Month</label>
+      <select id="modal-bday-month"></select>
+      <label class="field-label">Day</label>
+      <select id="modal-bday-day"></select>
+    </div>
     <div class="modal-btns">
       <button class="btn-secondary" onclick="closeModal()">Cancel</button>
       <button class="btn-primary" id="btn-book" onclick="confirmBook()">Book</button>
@@ -173,8 +186,6 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
 <div class="toast" id="toast"></div>
 
 <script>
-// Desk order: [top-left, top-right, bottom-left, bottom-right]
-// panorama: index of the desk in each office that has a panoramic screen (null = none)
 const ROOMS=[
   {name:"Office 1",desks:4,color:"#9FE1CB",tc:"#085041",window:"top",panorama:[2,3]},
   {name:"Office 2",desks:4,color:"#B5D4F4",tc:"#0C447C",window:"top",panorama:[2,3]},
@@ -188,6 +199,7 @@ const ABSENCE_TYPES=[
   {key:"work",label:"Work Trip",color:"#B5D4F4",tc:"#0C447C",icon:"ti-briefcase"},
   {key:"other",label:"Other",color:"#ececec",tc:"#555",icon:"ti-dots"}
 ];
+
 // Cleaning rota 1 — starts Mon July 6, 2026; 8-week cycle
 const CLEANING_START_1=new Date('2026-07-06');
 const CLEANING_ROTA_1=[
@@ -200,16 +212,16 @@ const CLEANING_ROTA_1=[
   ['Vera','Natalie'],
   ['Maria','Martin'],
 ];
-// Cleaning rota 2 — starts Mon Aug 31, 2026 (week of Sep 1); 9-week cycle
+// Cleaning rota 2 — starts Mon Aug 31, 2026 (week of Sep 1); 7-week cycle
 const CLEANING_START_2=new Date('2026-08-31');
 const CLEANING_ROTA_2=[
   ['Frieder','Marius','Marlin','Lennart'],
-  ['Clara','Anna','Martje','Elzina', 'Maria'],
-  ['Jannik','Mika','Louis', 'Tomás'],
-  ['Doro','Jana','Mara', 'Natalie'],
-  ['Nino','Josh', 'Jennifer', 'Amelie', 'Ana'],
+  ['Clara','Anna','Martje','Elzina','Maria'],
+  ['Jannik','Mika','Louis','Tomás'],
+  ['Doro','Jana','Mara','Natalie'],
+  ['Nino','Josh','Jennifer','Amelie','Ana'],
   ['Nelly','Tessa','Aurelia','Marcela'],
-  ['Kiwoong','Max','Sven', 'Martin'],
+  ['Kiwoong','Max','Sven','Martin'],
 ];
 function getCleaningTeam(mon){
   const useRota2=mon>=CLEANING_START_2;
@@ -221,15 +233,12 @@ function getCleaningTeam(mon){
 }
 function nameMatchesCleaning(name,team){
   const n=name.toLowerCase();
-  return team.some(m=>{
-    const mn=m.toLowerCase();
-    return n.startsWith(mn)||mn.startsWith(n);
-  });
+  return team.some(m=>{const mn=m.toLowerCase();return n.startsWith(mn)||mn.startsWith(n);});
 }
 
-let weekOffset=0,bookings={},absences=[],pending=null,currentTab='desks',selectedType='vacation';
+let weekOffset=0,bookings={},absences=[],birthdays=[],pending=null,currentTab='desks',selectedType='vacation';
 const congratsShown=new Set();
-const API_URL='https://script.google.com/macros/s/AKfycbzOtyq95VhFw-ZIKxM7BvTLiYFoDI_9ArfqwLmWXBEUzlpWHqkKjeS5-SBG4UpE_5Oe/exec';
+const API_URL='https://script.google.com/macros/s/AKfycbyncUP8kYef-wy6wUlCUtLv-LJj2d7MZtJKtXzt_r-fZsVZpM0-lwKSc-zM537ZWrTmsw/exec';
 loadBookings();
 
 async function loadBookings(){
@@ -241,12 +250,12 @@ async function loadBookings(){
     absences=(d.absences||[]).map(a=>{
       let date=a.date||'';
       if(date.length>10){
-        // Timestamp like "2026-07-01T22:00:00.000Z" — parse in local time to get correct date
         const dt=new Date(date);
         date=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
       }
       return{key:a.key,name:a.name,type:a.type||'other',date};
     });
+    birthdays=(d.birthdays||[]).map(b=>({key:b.key,name:b.name,date:b.date||''}));
     renderDesks();
     if(currentTab==='abs')renderAbsences();
   }catch(e){toast('Could not connect – working offline');renderDesks();}
@@ -260,20 +269,13 @@ async function apiWrite(action,key,name,note,date){
     const r=await fetch(url);
     const text=await r.text();
     console.log('apiWrite response:',text);
-    if(!r.ok || /error/i.test(text)){
-      toast('Save may have failed – check console');
-      console.error('Apps Script response indicates a problem:',text);
-    }
-  }catch(e){
-    toast('Could not save – see console for details');
-    console.error('apiWrite failed:',e);
-  }
+    if(!r.ok||/error/i.test(text)){toast('Save may have failed – check console');console.error('Apps Script error:',text);}
+  }catch(e){toast('Could not save – see console for details');console.error('apiWrite failed:',e);}
 }
 
 function getMonday(offset){
   const d=new Date();d.setHours(0,0,0,0);
   const day=d.getDay();
-  // On weekend (Sat=6, Sun=0), start on next week
   const weekendOffset=(day===6||day===0)?1:0;
   d.setDate(d.getDate()+(day===0?-6:day===6?-5:1-day)+(offset+weekendOffset)*7);
   return d;
@@ -299,7 +301,7 @@ function isPast(base,i){
 function isAllowed(o){return o===0||o===1;}
 
 function renderOffice(room,ri,dk,past){
-  const slots = room.desks===4 ? [0,1,2,3] : [0,1,2,'x'];
+  const slots=room.desks===4?[0,1,2,3]:[0,1,2,'x'];
   let desksHtml='';
   slots.forEach(deskIdx=>{
     if(deskIdx==='x'){desksHtml+=`<div class="desk desk-phantom"></div>`;return;}
@@ -332,30 +334,25 @@ function renderDesks(){
   }
   let h='<div class="day-header"></div>';
   DAYS.forEach((d,i)=>{
-    const t=isToday(mon,i);
-    const p=isPast(mon,i);
+    const t=isToday(mon,i),p=isPast(mon,i);
     h+=`<div class="day-header${t?' today':p?' past':''}">${d}<br><span style="font-size:10px">${new Date(dateKey(mon,i)).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'})}</span></div>`;
   });
   ROOMS.forEach((room,ri)=>{
     h+=`<div class="room-label"><span style="width:8px;height:8px;border-radius:50%;background:${room.color};display:inline-block;flex-shrink:0"></span>${room.name}</div>`;
     DAYS.forEach((_,di)=>{
-      const dk=dateKey(mon,di);
-      const p=isPast(mon,di);
+      const dk=dateKey(mon,di),p=isPast(mon,di);
       h+=`<div class="cell${p?' cell-past':''}">${renderOffice(room,ri,dk,p)}</div>`;
     });
   });
   document.getElementById('desk-grid').innerHTML=h;
 
-  // Cleaning banner
   const ct=getCleaningTeam(mon);
   const banner=document.getElementById('cleaning-banner');
   if(ct){
     document.getElementById('cleaning-text').innerHTML=`This week's kitchen team: <strong>${ct.team.join(', ')}</strong>`;
     document.getElementById('cleaning-week-tag').textContent=`Week ${ct.weekNum}`;
     banner.classList.remove('hidden');
-  }else{
-    banner.classList.add('hidden');
-  }
+  }else{banner.classList.add('hidden');}
 
   let sh='';
   DAYS.forEach((d,di)=>{
@@ -377,9 +374,14 @@ function renderAbsences(){
   DAYS.forEach((d,di)=>{
     const dk=dateKey(mon,di);
     const t=isToday(mon,di);
-    const entries=absences.filter(a=>a.date===dk);
+    const mmdd=dk.slice(5);
     let listHtml='';
-    entries.forEach(a=>{
+    // Birthdays first
+    birthdays.filter(b=>b.date===mmdd).forEach(b=>{
+      listHtml+=`<div class="birthday-entry" onclick="openCancelBirthday('${b.key}','${escapeAttr(b.name)}')" title="Click to remove">🎂 <span>${escapeHtml(b.name)}</span></div>`;
+    });
+    // Absences
+    absences.filter(a=>a.date===dk).forEach(a=>{
       const type=ABSENCE_TYPES.find(t=>t.key===a.type)||ABSENCE_TYPES[2];
       listHtml+=`<div class="absence-entry" style="background:${type.color};color:${type.tc}" onclick="openCancelAbsence('${a.key}','${escapeAttr(a.name)}','${type.key}')" title="Click to remove"><i class="ti ${type.icon}"></i><span>${escapeHtml(a.name)}</span></div>`;
     });
@@ -393,8 +395,7 @@ function renderAbsences(){
 }
 
 function switchTab(t,el){
-  currentTab=t;
-  weekOffset=0;
+  currentTab=t;weekOffset=0;
   document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('tab-desks').style.display=t==='desks'?'':'none';
@@ -405,8 +406,7 @@ function switchTab(t,el){
 function changeWeek(d){
   const next=weekOffset+d;
   if(currentTab==='desks'&&(next<0||next>1)){toast('Only current and next week are available for desk booking');return;}
-  weekOffset=next;
-  renderDesks();
+  weekOffset=next;renderDesks();
   if(currentTab==='abs')renderAbsences();
 }
 function openBook(key,label){
@@ -417,6 +417,8 @@ function openBook(key,label){
   document.getElementById('modal-note').style.display='';
   document.getElementById('modal-note-label').style.display='';
   document.getElementById('modal-type-wrap').style.display='none';
+  document.getElementById('modal-birthday-wrap').style.display='none';
+  document.getElementById('btn-book').textContent='Book';
   document.getElementById('btn-book').style.display='';
   document.getElementById('btn-cancel').style.display='none';
   document.getElementById('modal').style.display='flex';
@@ -430,6 +432,7 @@ function openCancel(key,name,note,label){
   document.getElementById('modal-note').style.display='';
   document.getElementById('modal-note-label').style.display='';
   document.getElementById('modal-type-wrap').style.display='none';
+  document.getElementById('modal-birthday-wrap').style.display='none';
   document.getElementById('btn-book').style.display='none';
   document.getElementById('btn-cancel').style.display='';
   document.getElementById('modal').style.display='flex';
@@ -443,16 +446,17 @@ function renderTypeSelect(){
 }
 function selectType(k){selectedType=k;renderTypeSelect();}
 function openAddAbsence(date){
-  selectedType='vacation';
-  pending={type:'addAbsence'};
+  selectedType='vacation';pending={type:'addAbsence'};
   document.getElementById('modal-title').textContent='Add absence';
   document.getElementById('modal-name').value='';
   document.getElementById('modal-note').style.display='none';
   document.getElementById('modal-note-label').style.display='none';
   document.getElementById('modal-type-wrap').style.display='';
+  document.getElementById('modal-birthday-wrap').style.display='none';
   document.getElementById('modal-date-from').value=date;
   document.getElementById('modal-date-to').value='';
   renderTypeSelect();
+  document.getElementById('btn-book').textContent='Book';
   document.getElementById('btn-book').style.display='';
   document.getElementById('btn-cancel').style.display='none';
   document.getElementById('modal').style.display='flex';
@@ -466,6 +470,43 @@ function openCancelAbsence(key,name,type){
   document.getElementById('modal-note').style.display='none';
   document.getElementById('modal-note-label').style.display='none';
   document.getElementById('modal-type-wrap').style.display='none';
+  document.getElementById('modal-birthday-wrap').style.display='none';
+  document.getElementById('btn-book').style.display='none';
+  document.getElementById('btn-cancel').style.display='';
+  document.getElementById('modal').style.display='flex';
+}
+function buildBirthdaySelects(){
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const ms=document.getElementById('modal-bday-month');
+  const ds=document.getElementById('modal-bday-day');
+  if(!ms.options.length){
+    months.forEach((m,i)=>{const o=document.createElement('option');o.value=String(i+1).padStart(2,'0');o.textContent=m;ms.appendChild(o);});
+    for(let d=1;d<=31;d++){const o=document.createElement('option');o.value=String(d).padStart(2,'0');o.textContent=d;ds.appendChild(o);}
+  }
+}
+function openAddBirthday(){
+  pending={type:'addBirthday'};
+  document.getElementById('modal-title').textContent='Add birthday 🎂';
+  document.getElementById('modal-name').value='';
+  document.getElementById('modal-note').style.display='none';
+  document.getElementById('modal-note-label').style.display='none';
+  document.getElementById('modal-type-wrap').style.display='none';
+  document.getElementById('modal-birthday-wrap').style.display='';
+  buildBirthdaySelects();
+  document.getElementById('btn-book').textContent='Save';
+  document.getElementById('btn-book').style.display='';
+  document.getElementById('btn-cancel').style.display='none';
+  document.getElementById('modal').style.display='flex';
+  setTimeout(()=>document.getElementById('modal-name').focus(),50);
+}
+function openCancelBirthday(key,name){
+  pending={type:'cancelBirthday',key,name};
+  document.getElementById('modal-title').textContent=`🎂 ${name}'s birthday`;
+  document.getElementById('modal-name').value=name;
+  document.getElementById('modal-note').style.display='none';
+  document.getElementById('modal-note-label').style.display='none';
+  document.getElementById('modal-type-wrap').style.display='none';
+  document.getElementById('modal-birthday-wrap').style.display='none';
   document.getElementById('btn-book').style.display='none';
   document.getElementById('btn-cancel').style.display='';
   document.getElementById('modal').style.display='flex';
@@ -476,8 +517,7 @@ async function confirmBook(){
   const name=document.getElementById('modal-name').value.trim();
   if(!name){toast('Please enter your name');return;}
   const btnBook=document.getElementById('btn-book');
-  btnBook.disabled=true;
-  btnBook.textContent='Saving…';
+  btnBook.disabled=true;btnBook.textContent='Saving…';
   try{
     if(pending.type==='book'){
       const note=document.getElementById('modal-note').value.trim();
@@ -488,17 +528,14 @@ async function confirmBook(){
       const ct=getCleaningTeam(mon);
       if(ct&&nameMatchesCleaning(name,ct.team)&&!congratsShown.has(name.toLowerCase())){
         congratsShown.add(name.toLowerCase());
-        closeModal();
-        showCongrats(name,ct.team);
-        return;
+        closeModal();showCongrats(name,ct.team);return;
       }
       toast('Desk booked!');
     }else if(pending.type==='addAbsence'){
       const fromStr=document.getElementById('modal-date-from').value;
       const toStr=document.getElementById('modal-date-to').value||fromStr;
       if(!fromStr){toast('Please select a start date');return;}
-      const from=new Date(fromStr);
-      const to=new Date(toStr);
+      const from=new Date(fromStr),to=new Date(toStr);
       if(to<from){toast('End date must be after start date');return;}
       const dates=[];
       for(let d=new Date(from);d<=to;d.setDate(d.getDate()+1)){
@@ -512,19 +549,25 @@ async function confirmBook(){
       }
       renderAbsences();
       toast(dates.length>1?`Absence added for ${dates.length} days`:'Absence added');
+    }else if(pending.type==='addBirthday'){
+      const month=document.getElementById('modal-bday-month').value;
+      const day=document.getElementById('modal-bday-day').value;
+      const mmdd=`${month}-${day}`;
+      const key='bday_'+mmdd+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+      birthdays.push({key,name,date:mmdd});
+      await apiWrite('book',key,name,mmdd);
+      renderAbsences();
+      toast(`🎂 Birthday saved for ${name}!`);
     }
     closeModal();
   }catch(err){
     console.error('confirmBook error:',err);
     toast('Something went wrong – please try again');
   }finally{
-    btnBook.disabled=false;
-    btnBook.textContent='Book';
+    btnBook.disabled=false;btnBook.textContent=pending?.type==='addBirthday'?'Save':'Book';
   }
 }
 function showCongrats(name,team){
-  document.getElementById('congrats-text').textContent=`Congrats, ${name}! You've been selected for kitchen duties this week together with ${team.filter(m=>!nameMatchesCleaning(name,[m])||team.length===1?true:false).join(', ')}.`;
-  // Simpler: just show the whole team
   document.getElementById('congrats-text').textContent=`Congrats, ${name}! You've been selected for kitchen duties this week. Your team: ${team.join(', ')}.`;
   document.getElementById('congrats-modal-bg').style.display='flex';
 }
@@ -541,6 +584,10 @@ async function cancelBook(){
     absences=absences.filter(a=>a.key!==pending.key);
     await apiWrite('cancel',pending.key,'');
     renderAbsences();toast('Absence removed');
+  }else if(pending.type==='cancelBirthday'){
+    birthdays=birthdays.filter(b=>b.key!==pending.key);
+    await apiWrite('cancel',pending.key,'');
+    renderAbsences();toast('Birthday removed');
   }
   closeModal();
 }
