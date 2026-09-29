@@ -267,7 +267,8 @@ async function loadBookings(){
     if(currentTab==='abs')renderAbsences();
   }catch(e){
     console.error('loadBookings error:',e);
-    document.getElementById('loading-state').innerHTML='<div style="font-size:24px;margin-bottom:12px">⚠️</div><div style="font-size:14px;font-weight:500;margin-bottom:6px">Could not connect</div><div style="font-size:12px;color:#aaa;margin-bottom:1rem">Working offline — bookings may not be up to date</div><button onclick="loadBookings()" style="padding:8px 18px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;font-size:13px">Try again</button>';
+    const msg=e?.message||e?.details||JSON.stringify(e)||'Unknown error';
+    document.getElementById('loading-state').innerHTML=`<div style="font-size:24px;margin-bottom:12px">⚠️</div><div style="font-size:14px;font-weight:500;margin-bottom:6px">Could not connect</div><div style="font-size:12px;color:#aaa;margin-bottom:6px">Working offline — bookings may not be up to date</div><div style="font-size:11px;color:#c00;background:#fff0f0;border-radius:6px;padding:8px;margin-bottom:1rem;word-break:break-all">${msg}</div><button onclick="loadBookings()" style="padding:8px 18px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;font-size:13px">Try again</button>`;
     renderDesks();
   }
 }
