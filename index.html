@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Office Booking System</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:system-ui,sans-serif;background:#f8f9fa;color:#1a1a1a;min-height:100vh}
@@ -35,8 +36,6 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
 .room-label{padding:8px 10px;font-size:12px;font-weight:500;background:#fafafa;border-right:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;gap:6px;color:#555}
 .cell{border-bottom:1px solid #e0e0e0;border-right:1px solid #e0e0e0;padding:6px;display:flex;align-items:center;justify-content:center;min-height:88px}
 .cell:last-child{border-right:none}
-
-/* Office layout */
 .office-box{position:relative;width:80px;height:80px}
 .win{position:absolute;background:#a8d8f0;border-radius:2px;z-index:1}
 .win.top{top:0;left:15%;width:70%;height:4px}
@@ -58,8 +57,6 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
 .day-header.past{color:#bbb;background:#f9f9f9}
 .cell-past{background:#fafafa}
 .cell-past .office-box .win{background:#d8d8d8}
-
-/* Absence calendar */
 .absence-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
 .absence-day{background:#fff;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;min-height:220px}
 .absence-day-header{padding:8px 6px;text-align:center;font-size:12px;font-weight:500;background:#f5f5f5;border-bottom:1px solid #e0e0e0;color:#555}
@@ -78,8 +75,6 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
 .type-opt{flex:1;padding:8px 4px;border:1.5px solid #ddd;border-radius:8px;font-size:11px;text-align:center;cursor:pointer;color:#666;display:flex;flex-direction:column;align-items:center;gap:3px}
 .type-opt i{font-size:15px}
 .type-opt.selected{border-color:#185FA5;background:#E6F1FB;color:#0C447C;font-weight:600}
-
-/* Modal */
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100}
 .modal{background:#fff;border-radius:12px;padding:1.5rem;width:300px;box-shadow:0 8px 32px rgba(0,0,0,0.12)}
 .modal h3{font-size:15px;font-weight:500;margin-bottom:1rem}
@@ -107,7 +102,6 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
 <body>
 <div class="app">
   <h1><i class="ti ti-building-office" aria-hidden="true"></i> Office Booking System</h1>
-
   <div class="tabs">
     <button class="tab active" onclick="switchTab('desks',this)"><i class="ti ti-armchair" aria-hidden="true"></i> Desks</button>
     <button class="tab" onclick="switchTab('abs',this)"><i class="ti ti-calendar-time" aria-hidden="true"></i> Absences</button>
@@ -121,6 +115,11 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
     </div>
     <div class="stats-bar" id="stats-bar"></div>
     <div class="cleaning-banner hidden" id="cleaning-banner">🍽 <span id="cleaning-text"></span><span class="week-tag" id="cleaning-week-tag"></span></div>
+    <div id="loading-state" style="text-align:center;padding:3rem 1rem;color:#888">
+      <div style="font-size:28px;margin-bottom:12px">⏳</div>
+      <div style="font-size:14px;font-weight:500;margin-bottom:6px">Loading bookings…</div>
+      <div style="font-size:12px;color:#aaa">This can take a few seconds on first load</div>
+    </div>
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:#ececec;border:1px solid #ccc"></div>Free</div>
       <div class="legend-item"><div class="legend-dot" style="background:#9FE1CB"></div>Office 1</div>
@@ -186,6 +185,19 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
 <div class="toast" id="toast"></div>
 
 <script>
+// ── Supabase config ──────────────────────────────────────────────────────────
+const SUPABASE_URL  = 'https://bwvcroelyvchxntcfihb.supabase.co';   // e.g. https://xxxx.supabase.co
+const SUPABASE_KEY  = 'sb_publishable_WEMi20---nJwZlxwMMqQZg_-UWDZWo7';
+const { createClient } = window.supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function tableFor(key){
+  if(key.startsWith('abs_'))  return 'absences';
+  if(key.startsWith('bday_')) return 'birthdays';
+  return 'bookings';
+}
+
+// ── Room / rota config ───────────────────────────────────────────────────────
 const ROOMS=[
   {name:"Office 1",desks:4,color:"#9FE1CB",tc:"#085041",window:"top",panorama:[2,3]},
   {name:"Office 2",desks:4,color:"#B5D4F4",tc:"#0C447C",window:"top",panorama:[2,3]},
@@ -195,38 +207,30 @@ const ROOMS=[
 ];
 const DAYS=["Mon","Tue","Wed","Thu","Fri"];
 const ABSENCE_TYPES=[
-  {key:"vacation",label:"Vacation",color:"#FAC775",tc:"#633806",icon:"ti-beach"},
-  {key:"work",label:"Work Trip",color:"#B5D4F4",tc:"#0C447C",icon:"ti-briefcase"},
-  {key:"other",label:"Other",color:"#ececec",tc:"#555",icon:"ti-dots"}
+  {key:"vacation",  label:"Vacation",  color:"#FAC775",tc:"#633806",icon:"ti-beach"},
+  {key:"work",      label:"Work Trip", color:"#B5D4F4",tc:"#0C447C",icon:"ti-briefcase"},
+  {key:"other",     label:"Other",     color:"#ececec",tc:"#555",   icon:"ti-dots"}
 ];
 
-// Cleaning rota 1 — starts Mon July 6, 2026; 8-week cycle
 const CLEANING_START_1=new Date('2026-07-06');
 const CLEANING_ROTA_1=[
-  ['Clara','Frieder','Marius'],
-  ['Jannik','Mika'],
-  ['Doro','Jana'],
-  ['Nino','Tomás'],
-  ['Nelly','Ana'],
-  ['Kiwoong','Max'],
-  ['Vera','Natalie'],
-  ['Maria','Martin'],
+  ['Clara','Frieder','Marius'],['Jannik','Mika'],['Doro','Jana'],['Nino','Tomás'],
+  ['Nelly','Ana'],['Kiwoong','Max'],['Vera','Natalie'],['Maria','Martin'],
 ];
-// Cleaning rota 2 — starts Mon Aug 31, 2026 (week of Sep 1); 7-week cycle
-const CLEANING_START_2=new Date('2026-08-30');
+const CLEANING_START_2=new Date('2026-08-31');
 const CLEANING_ROTA_2=[
   ['Frieder','Marius','Marlin','Lennart'],
   ['Clara','Anna','Martje','Elzina','Maria'],
   ['Jannik','Mika','Louis','Tomás'],
   ['Doro','Jana','Mara','Natalie'],
-  ['Nino','Josh','Jenni','Amelie','Ana'],
+  ['Nino','Josh','Jennifer','Amelie','Ana'],
   ['Nelly','Tessa','Aurelia','Marcela'],
   ['Kiwoong','Max','Sven','Martin'],
 ];
 function getCleaningTeam(mon){
   const useRota2=mon>=CLEANING_START_2;
   const start=useRota2?CLEANING_START_2:CLEANING_START_1;
-  const rota=useRota2?CLEANING_ROTA_2:CLEANING_ROTA_1;
+  const rota =useRota2?CLEANING_ROTA_2 :CLEANING_ROTA_1;
   const diff=Math.round((mon-start)/(7*24*60*60*1000));
   if(diff<0)return null;
   return{weekNum:diff+1,team:rota[diff%rota.length]};
@@ -236,48 +240,53 @@ function nameMatchesCleaning(name,team){
   return team.some(m=>{const mn=m.toLowerCase();return n.startsWith(mn)||mn.startsWith(n);});
 }
 
+// ── State ────────────────────────────────────────────────────────────────────
 let weekOffset=0,bookings={},absences=[],birthdays=[],pending=null,currentTab='desks',selectedType='vacation';
 const congratsShown=new Set();
-const API_URL='https://script.google.com/macros/s/AKfycbwhYKPwyh29gENtktbj0LdCu27NOMKZEOKQhijTOIOwcvt-FFxmSr6C6baHbNL5Ln7UeA/exec';
-loadBookings();
 
+// ── Data loading ─────────────────────────────────────────────────────────────
 async function loadBookings(){
   try{
-    const r=await fetch(API_URL+'?action=getAll');
-    const d=await r.json();
+    // All three tables fetched in parallel — much faster than sequential
+    const [bRes,aRes,bdRes]=await Promise.all([
+      db.from('bookings').select('*'),
+      db.from('absences').select('*'),
+      db.from('birthdays').select('*'),
+    ]);
+    if(bRes.error)  throw bRes.error;
+    if(aRes.error)  throw aRes.error;
+    if(bdRes.error) throw bdRes.error;
+
     bookings={};
-    (d.bookings||[]).forEach(b=>bookings[b.key]={name:b.name,note:b.note||''});
-    absences=(d.absences||[]).map(a=>{
-      let date=a.date||'';
-      if(date.length>10){
-        const dt=new Date(date);
-        date=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
-      }
-      return{key:a.key,name:a.name,type:a.type||'other',date};
-    });
-    birthdays=(d.birthdays||[]).map(b=>({key:b.key,name:b.name,date:b.date||''}));
+    (bRes.data||[]).forEach(r=>bookings[r.id]={name:r.name,note:r.note||''});
+    absences=(aRes.data||[]).map(r=>({key:r.id,name:r.name,type:r.type||'other',date:r.date||''}));
+    birthdays=(bdRes.data||[]).map(r=>({key:r.id,name:r.name,date:r.date||''}));
+
+    document.getElementById('loading-state').style.display='none';
     renderDesks();
     if(currentTab==='abs')renderAbsences();
-  }catch(e){toast('Could not connect – working offline');renderDesks();}
+  }catch(e){
+    console.error('loadBookings error:',e);
+    document.getElementById('loading-state').innerHTML='<div style="font-size:24px;margin-bottom:12px">⚠️</div><div style="font-size:14px;font-weight:500;margin-bottom:6px">Could not connect</div><div style="font-size:12px;color:#aaa;margin-bottom:1rem">Working offline — bookings may not be up to date</div><button onclick="loadBookings()" style="padding:8px 18px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;font-size:13px">Try again</button>';
+    renderDesks();
+  }
 }
 
-async function apiWrite(action,key,name,note,date){
-  try{
-    let url=`${API_URL}?action=${action}&key=${encodeURIComponent(key)}&name=${encodeURIComponent(name||'')}`;
-    if(note!==undefined)url+=`&note=${encodeURIComponent(note||'')}`;
-    if(date!==undefined)url+=`&date=${encodeURIComponent(date||'')}`;
-    const r=await fetch(url);
-    const text=await r.text();
-    console.log('apiWrite response:',text);
-    if(!r.ok||/error/i.test(text)){toast('Save may have failed – check console');console.error('Apps Script error:',text);}
-  }catch(e){toast('Could not save – see console for details');console.error('apiWrite failed:',e);}
+async function dbWrite(key,row){
+  const {error}=await db.from(tableFor(key)).upsert({id:key,...row},{onConflict:'id'});
+  if(error)throw error;
+}
+async function dbDelete(key){
+  const {error}=await db.from(tableFor(key)).delete().eq('id',key);
+  if(error)throw error;
 }
 
+// ── Date helpers ─────────────────────────────────────────────────────────────
 function getMonday(offset){
   const d=new Date();d.setHours(0,0,0,0);
   const day=d.getDay();
-  const weekendOffset=(day===6||day===0)?1:0;
-  d.setDate(d.getDate()+(day===0?-6:day===6?-5:1-day)+(offset+weekendOffset)*7);
+  const wo=(day===6||day===0)?1:0;
+  d.setDate(d.getDate()+(day===0?-6:day===6?-5:1-day)+(offset+wo)*7);
   return d;
 }
 function dateKey(base,i){
@@ -289,40 +298,30 @@ function formatWeek(mon){
   const f=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'});
   return f(mon)+" – "+f(fri)+" "+fri.getFullYear();
 }
-function isToday(base,i){
-  const d=new Date(base);d.setDate(d.getDate()+i);
-  return d.toDateString()===new Date().toDateString();
-}
-function isPast(base,i){
-  const d=new Date(base);d.setDate(d.getDate()+i);
-  const today=new Date();today.setHours(0,0,0,0);
-  return d<today;
-}
+function isToday(base,i){const d=new Date(base);d.setDate(d.getDate()+i);return d.toDateString()===new Date().toDateString();}
+function isPast(base,i){const d=new Date(base);d.setDate(d.getDate()+i);const t=new Date();t.setHours(0,0,0,0);return d<t;}
 function isAllowed(o){return o===0||o===1;}
+function escapeHtml(s){return(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escapeAttr(s){return(s||'').replace(/'/g,"\\'");}
 
+// ── Render desks ─────────────────────────────────────────────────────────────
 function renderOffice(room,ri,dk,past){
   const slots=room.desks===4?[0,1,2,3]:[0,1,2,'x'];
-  let desksHtml='';
-  slots.forEach(deskIdx=>{
-    if(deskIdx==='x'){desksHtml+=`<div class="desk desk-phantom"></div>`;return;}
-    const bk=`${dk}_r${ri}_d${deskIdx}`;
-    const b=bookings[bk];
-    const isPano=room.panorama.includes(deskIdx);
-    const panoIcon=isPano?'<i class="ti ti-device-desktop pano-icon"></i>':'';
+  let h='';
+  slots.forEach(di=>{
+    if(di==='x'){h+=`<div class="desk desk-phantom"></div>`;return;}
+    const bk=`${dk}_r${ri}_d${di}`,b=bookings[bk],isPano=room.panorama.includes(di);
+    const pano=isPano?'<i class="ti ti-device-desktop pano-icon"></i>':'';
     if(b){
-      const style=past?'background:#d0d0d0;color:#999;border-color:#d0d0d0':`background:${room.color};color:${room.tc};border-color:${room.color}`;
+      const st=past?'background:#d0d0d0;color:#999;border-color:#d0d0d0':`background:${room.color};color:${room.tc};border-color:${room.color}`;
       const noteHtml=b.note?`<div class="desk-note">${escapeHtml(b.note)}</div>`:'';
-      const titleNote=b.note?` (${b.note})`:'';
-      desksHtml+=`<div class="desk desk-taken" style="${style}" title="${escapeHtml(b.name)}${titleNote}${past?'':' – click to remove'}" ${past?'':`onclick="openCancel('${bk}','${escapeAttr(b.name)}','${escapeAttr(b.note||'')}','${room.name} Desk ${deskIdx+1}')"`}>${panoIcon}<span>${b.name.slice(0,2).toUpperCase()}</span>${noteHtml}</div>`;
+      h+=`<div class="desk desk-taken" style="${st}" title="${escapeHtml(b.name)}${b.note?' ('+b.note+')':''}${past?'':' – click to remove'}" ${past?'':`onclick="openCancel('${bk}','${escapeAttr(b.name)}','${escapeAttr(b.note||'')}','${room.name} Desk ${di+1}')"`}>${pano}<span>${b.name.slice(0,2).toUpperCase()}</span>${noteHtml}</div>`;
     }else{
-      desksHtml+=`<div class="desk${past?' desk-phantom':' desk-free'}" ${past?'':`title="Free – click to book${isPano?' (panorama screen)':''}" onclick="openBook('${bk}','${room.name} Desk ${deskIdx+1}')"`}>${panoIcon}</div>`;
+      h+=`<div class="desk${past?' desk-phantom':' desk-free'}" ${past?'':`title="Free – click to book${isPano?' (panorama screen)':''}" onclick="openBook('${bk}','${room.name} Desk ${di+1}')"`}>${pano}</div>`;
     }
   });
-  return `<div class="office-box"><div class="win ${room.window}"></div><div class="desks">${desksHtml}</div></div>`;
+  return `<div class="office-box"><div class="win ${room.window}"></div><div class="desks">${h}</div></div>`;
 }
-
-function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function escapeAttr(s){return (s||'').replace(/'/g,"\\'");}
 
 function renderDesks(){
   const mon=getMonday(weekOffset);
@@ -346,8 +345,7 @@ function renderDesks(){
   });
   document.getElementById('desk-grid').innerHTML=h;
 
-  const ct=getCleaningTeam(mon);
-  const banner=document.getElementById('cleaning-banner');
+  const ct=getCleaningTeam(mon),banner=document.getElementById('cleaning-banner');
   if(ct){
     document.getElementById('cleaning-text').innerHTML=`This week's kitchen team: <strong>${ct.team.join(', ')}</strong>`;
     document.getElementById('cleaning-week-tag').textContent=`Week ${ct.weekNum}`;
@@ -358,29 +356,23 @@ function renderDesks(){
   DAYS.forEach((d,di)=>{
     const dk=dateKey(mon,di);
     let total=0,booked=0;
-    ROOMS.forEach((room,ri)=>{
-      total+=room.desks;
-      for(let desk=0;desk<room.desks;desk++){if(bookings[`${dk}_r${ri}_d${desk}`])booked++;}
-    });
+    ROOMS.forEach((room,ri)=>{total+=room.desks;for(let desk=0;desk<room.desks;desk++){if(bookings[`${dk}_r${ri}_d${desk}`])booked++;}});
     sh+=`<div class="stat${isToday(mon,di)?' today':''}"><div class="stat-num">${booked}/${total}</div><div class="stat-label">${d}${isToday(mon,di)?' · today':''}</div></div>`;
   });
   document.getElementById('stats-bar').innerHTML=sh;
 }
 
+// ── Render absences ───────────────────────────────────────────────────────────
 function renderAbsences(){
   const mon=getMonday(weekOffset);
   document.getElementById('week-label-abs').textContent=formatWeek(mon);
   let h='';
   DAYS.forEach((d,di)=>{
-    const dk=dateKey(mon,di);
-    const t=isToday(mon,di);
-    const mmdd=dk.slice(5);
+    const dk=dateKey(mon,di),t=isToday(mon,di),mmdd=dk.slice(5);
     let listHtml='';
-    // Birthdays first
     birthdays.filter(b=>b.date===mmdd).forEach(b=>{
       listHtml+=`<div class="birthday-entry" onclick="openCancelBirthday('${b.key}','${escapeAttr(b.name)}')" title="Click to remove">🎂 <span>${escapeHtml(b.name)}</span></div>`;
     });
-    // Absences
     absences.filter(a=>a.date===dk).forEach(a=>{
       const type=ABSENCE_TYPES.find(t=>t.key===a.type)||ABSENCE_TYPES[2];
       listHtml+=`<div class="absence-entry" style="background:${type.color};color:${type.tc}" onclick="openCancelAbsence('${a.key}','${escapeAttr(a.name)}','${type.key}')" title="Click to remove"><i class="ti ${type.icon}"></i><span>${escapeHtml(a.name)}</span></div>`;
@@ -394,6 +386,7 @@ function renderAbsences(){
   document.getElementById('absence-grid').innerHTML=h;
 }
 
+// ── Tab / week nav ────────────────────────────────────────────────────────────
 function switchTab(t,el){
   currentTab=t;weekOffset=0;
   document.querySelectorAll('.tab').forEach(e=>e.classList.remove('active'));
@@ -409,18 +402,25 @@ function changeWeek(d){
   weekOffset=next;renderDesks();
   if(currentTab==='abs')renderAbsences();
 }
+
+// ── Modal helpers ─────────────────────────────────────────────────────────────
+function resetModal(){
+  document.getElementById('modal-note').style.display='none';
+  document.getElementById('modal-note-label').style.display='none';
+  document.getElementById('modal-type-wrap').style.display='none';
+  document.getElementById('modal-birthday-wrap').style.display='none';
+  document.getElementById('btn-book').style.display='';
+  document.getElementById('btn-book').textContent='Book';
+  document.getElementById('btn-cancel').style.display='none';
+}
 function openBook(key,label){
   pending={type:'book',key,label};
   document.getElementById('modal-title').textContent='Book: '+label;
   document.getElementById('modal-name').value='';
   document.getElementById('modal-note').value='';
+  resetModal();
   document.getElementById('modal-note').style.display='';
   document.getElementById('modal-note-label').style.display='';
-  document.getElementById('modal-type-wrap').style.display='none';
-  document.getElementById('modal-birthday-wrap').style.display='none';
-  document.getElementById('btn-book').textContent='Book';
-  document.getElementById('btn-book').style.display='';
-  document.getElementById('btn-cancel').style.display='none';
   document.getElementById('modal').style.display='flex';
   setTimeout(()=>document.getElementById('modal-name').focus(),50);
 }
@@ -429,36 +429,28 @@ function openCancel(key,name,note,label){
   document.getElementById('modal-title').textContent=`${label} – booked by ${name}${note?' ('+note+')':''}`;
   document.getElementById('modal-name').value=name;
   document.getElementById('modal-note').value=note||'';
+  resetModal();
   document.getElementById('modal-note').style.display='';
   document.getElementById('modal-note-label').style.display='';
-  document.getElementById('modal-type-wrap').style.display='none';
-  document.getElementById('modal-birthday-wrap').style.display='none';
   document.getElementById('btn-book').style.display='none';
   document.getElementById('btn-cancel').style.display='';
   document.getElementById('modal').style.display='flex';
 }
 function renderTypeSelect(){
-  let h='';
-  ABSENCE_TYPES.forEach(t=>{
-    h+=`<div class="type-opt${selectedType===t.key?' selected':''}" onclick="selectType('${t.key}')"><i class="ti ${t.icon}"></i>${t.label}</div>`;
-  });
-  document.getElementById('type-select').innerHTML=h;
+  document.getElementById('type-select').innerHTML=ABSENCE_TYPES.map(t=>
+    `<div class="type-opt${selectedType===t.key?' selected':''}" onclick="selectType('${t.key}')"><i class="ti ${t.icon}"></i>${t.label}</div>`
+  ).join('');
 }
 function selectType(k){selectedType=k;renderTypeSelect();}
 function openAddAbsence(date){
   selectedType='vacation';pending={type:'addAbsence'};
   document.getElementById('modal-title').textContent='Add absence';
   document.getElementById('modal-name').value='';
-  document.getElementById('modal-note').style.display='none';
-  document.getElementById('modal-note-label').style.display='none';
+  resetModal();
   document.getElementById('modal-type-wrap').style.display='';
-  document.getElementById('modal-birthday-wrap').style.display='none';
   document.getElementById('modal-date-from').value=date;
   document.getElementById('modal-date-to').value='';
   renderTypeSelect();
-  document.getElementById('btn-book').textContent='Book';
-  document.getElementById('btn-book').style.display='';
-  document.getElementById('btn-cancel').style.display='none';
   document.getElementById('modal').style.display='flex';
   setTimeout(()=>document.getElementById('modal-name').focus(),50);
 }
@@ -467,18 +459,14 @@ function openCancelAbsence(key,name,type){
   pending={type:'cancelAbsence',key,name};
   document.getElementById('modal-title').textContent=`${t.label} – ${name}`;
   document.getElementById('modal-name').value=name;
-  document.getElementById('modal-note').style.display='none';
-  document.getElementById('modal-note-label').style.display='none';
-  document.getElementById('modal-type-wrap').style.display='none';
-  document.getElementById('modal-birthday-wrap').style.display='none';
+  resetModal();
   document.getElementById('btn-book').style.display='none';
   document.getElementById('btn-cancel').style.display='';
   document.getElementById('modal').style.display='flex';
 }
 function buildBirthdaySelects(){
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const ms=document.getElementById('modal-bday-month');
-  const ds=document.getElementById('modal-bday-day');
+  const ms=document.getElementById('modal-bday-month'),ds=document.getElementById('modal-bday-day');
   if(!ms.options.length){
     months.forEach((m,i)=>{const o=document.createElement('option');o.value=String(i+1).padStart(2,'0');o.textContent=m;ms.appendChild(o);});
     for(let d=1;d<=31;d++){const o=document.createElement('option');o.value=String(d).padStart(2,'0');o.textContent=d;ds.appendChild(o);}
@@ -488,14 +476,10 @@ function openAddBirthday(){
   pending={type:'addBirthday'};
   document.getElementById('modal-title').textContent='Add birthday 🎂';
   document.getElementById('modal-name').value='';
-  document.getElementById('modal-note').style.display='none';
-  document.getElementById('modal-note-label').style.display='none';
-  document.getElementById('modal-type-wrap').style.display='none';
+  resetModal();
   document.getElementById('modal-birthday-wrap').style.display='';
-  buildBirthdaySelects();
   document.getElementById('btn-book').textContent='Save';
-  document.getElementById('btn-book').style.display='';
-  document.getElementById('btn-cancel').style.display='none';
+  buildBirthdaySelects();
   document.getElementById('modal').style.display='flex';
   setTimeout(()=>document.getElementById('modal-name').focus(),50);
 }
@@ -503,16 +487,15 @@ function openCancelBirthday(key,name){
   pending={type:'cancelBirthday',key,name};
   document.getElementById('modal-title').textContent=`🎂 ${name}'s birthday`;
   document.getElementById('modal-name').value=name;
-  document.getElementById('modal-note').style.display='none';
-  document.getElementById('modal-note-label').style.display='none';
-  document.getElementById('modal-type-wrap').style.display='none';
-  document.getElementById('modal-birthday-wrap').style.display='none';
+  resetModal();
   document.getElementById('btn-book').style.display='none';
   document.getElementById('btn-cancel').style.display='';
   document.getElementById('modal').style.display='flex';
 }
 function closeModal(){document.getElementById('modal').style.display='none';pending=null;}
 function bgClose(e){if(e.target===document.getElementById('modal'))closeModal();}
+
+// ── Confirm / cancel ──────────────────────────────────────────────────────────
 async function confirmBook(){
   const name=document.getElementById('modal-name').value.trim();
   if(!name){toast('Please enter your name');return;}
@@ -522,13 +505,11 @@ async function confirmBook(){
     if(pending.type==='book'){
       const note=document.getElementById('modal-note').value.trim();
       bookings[pending.key]={name,note};
-      await apiWrite('book',pending.key,name,note);
+      await dbWrite(pending.key,{name,note});
       renderDesks();
-      const mon=getMonday(weekOffset);
-      const ct=getCleaningTeam(mon);
+      const ct=getCleaningTeam(getMonday(weekOffset));
       if(ct&&nameMatchesCleaning(name,ct.team)&&!congratsShown.has(name.toLowerCase())){
-        congratsShown.add(name.toLowerCase());
-        closeModal();showCongrats(name,ct.team);return;
+        congratsShown.add(name.toLowerCase());closeModal();showCongrats(name,ct.team);return;
       }
       toast('Desk booked!');
     }else if(pending.type==='addAbsence'){
@@ -542,11 +523,12 @@ async function confirmBook(){
         const dow=d.getDay();
         if(dow!==0&&dow!==6)dates.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
       }
-      for(const date of dates){
+      // All writes in parallel
+      await Promise.all(dates.map(date=>{
         const key='abs_'+date+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
         absences.push({key,name,type:selectedType,date});
-        await apiWrite('book',key,name,selectedType,date);
-      }
+        return dbWrite(key,{name,type:selectedType,date});
+      }));
       renderAbsences();
       toast(dates.length>1?`Absence added for ${dates.length} days`:'Absence added');
     }else if(pending.type==='addBirthday'){
@@ -555,7 +537,7 @@ async function confirmBook(){
       const mmdd=`${month}-${day}`;
       const key='bday_'+mmdd+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
       birthdays.push({key,name,date:mmdd});
-      await apiWrite('book',key,name,mmdd);
+      await dbWrite(key,{name,date:mmdd});
       renderAbsences();
       toast(`🎂 Birthday saved for ${name}!`);
     }
@@ -564,31 +546,31 @@ async function confirmBook(){
     console.error('confirmBook error:',err);
     toast('Something went wrong – please try again');
   }finally{
-    btnBook.disabled=false;btnBook.textContent=pending?.type==='addBirthday'?'Save':'Book';
+    btnBook.disabled=false;
+    btnBook.textContent=pending?.type==='addBirthday'?'Save':'Book';
   }
 }
 function showCongrats(name,team){
   document.getElementById('congrats-text').textContent=`Congrats, ${name}! You've been selected for kitchen duties this week. Your team: ${team.join(', ')}.`;
   document.getElementById('congrats-modal-bg').style.display='flex';
 }
-function closeCongrats(){
-  document.getElementById('congrats-modal-bg').style.display='none';
-  toast('Desk booked!');
-}
+function closeCongrats(){document.getElementById('congrats-modal-bg').style.display='none';toast('Desk booked!');}
 async function cancelBook(){
-  if(pending.type==='cancel'){
-    delete bookings[pending.key];
-    await apiWrite('cancel',pending.key,'');
-    renderDesks();toast('Booking removed');
-  }else if(pending.type==='cancelAbsence'){
-    absences=absences.filter(a=>a.key!==pending.key);
-    await apiWrite('cancel',pending.key,'');
-    renderAbsences();toast('Absence removed');
-  }else if(pending.type==='cancelBirthday'){
-    birthdays=birthdays.filter(b=>b.key!==pending.key);
-    await apiWrite('cancel',pending.key,'');
-    renderAbsences();toast('Birthday removed');
-  }
+  try{
+    if(pending.type==='cancel'){
+      delete bookings[pending.key];
+      await dbDelete(pending.key);
+      renderDesks();toast('Booking removed');
+    }else if(pending.type==='cancelAbsence'){
+      absences=absences.filter(a=>a.key!==pending.key);
+      await dbDelete(pending.key);
+      renderAbsences();toast('Absence removed');
+    }else if(pending.type==='cancelBirthday'){
+      birthdays=birthdays.filter(b=>b.key!==pending.key);
+      await dbDelete(pending.key);
+      renderAbsences();toast('Birthday removed');
+    }
+  }catch(err){toast('Could not remove – please try again');}
   closeModal();
 }
 document.getElementById('modal-name').addEventListener('keydown',e=>{if(e.key==='Enter')confirmBook();});
@@ -597,6 +579,8 @@ function toast(msg){
   t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
 }
+
+loadBookings();
 </script>
 </body>
 </html>
