@@ -118,7 +118,33 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
 .ios-steps i{font-size:15px;vertical-align:-2px}
 .dn-full{display:none}
 
-.stat-date,.app-day-title,.room-free{display:none}
+.stat-date,.app-day-title,.room-free,.app-events{display:none}
+
+/* ── Events from the shared Google Sheet (Lecture Series, Jour fixe) ── */
+.ev-lecture{background:#E0E7FF;color:#3730A3}
+.ev-jf{background:#CCFBF1;color:#115E59}
+.ev-tags{display:flex;flex-direction:column;align-items:center;gap:3px;margin-top:4px}
+.ev-tags:empty{display:none}
+.ev-tag{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:600;cursor:pointer;white-space:nowrap}
+.ev-tag:hover,.event-entry:hover{opacity:0.75}
+.stat{position:relative}
+.ev-dots{position:absolute;top:6px;right:6px;display:flex;gap:3px}
+.ev-dot{width:7px;height:7px;border-radius:50%}
+.ev-dot.ev-lecture,.legend-dot.ev-lecture{background:#4F46E5}
+.ev-dot.ev-jf,.legend-dot.ev-jf{background:#0D9488}
+.legend-dot.ev-lecture,.legend-dot.ev-jf{border-radius:50%;width:9px;height:9px}
+.event-entry{display:flex;align-items:center;gap:5px;padding:5px 7px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer}
+.event-entry i{font-size:11px}
+.event-entry span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev-modal{width:360px;max-width:92vw}
+.ev-modal-body{max-height:60vh;overflow-y:auto;margin-bottom:1rem}
+.ev-item{border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.ev-item:last-child{margin-bottom:0}
+.ev-item-kind{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:5px;margin-bottom:4px}
+.ev-item-title{font-size:14px;font-weight:600;line-height:1.35;margin-bottom:6px}
+.ev-item dl{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:12px;line-height:1.45}
+.ev-item dt{opacity:.75}
+.ev-item dd{white-space:pre-line;word-break:break-word}
 
 /* ── Installed app (phone) layout — only active with <html class="app-mode"> ── */
 .app-mode body{background:#f3f5f8;padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left);-webkit-tap-highlight-color:transparent;overscroll-behavior-y:contain}
@@ -154,6 +180,19 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
 .app-mode .app-day-title{order:3;display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:2px 2px 8px;font-size:16px;font-weight:600}
 .app-mode .app-day-title small{font-size:12px;font-weight:500;color:#7a828c;white-space:nowrap}
 .app-mode #loading-state{order:4}
+/* Events of the selected day */
+.app-mode .ev-dots{top:5px;right:5px;gap:2px}
+.app-mode .ev-dot{width:6px;height:6px}
+.app-mode .stat.sel .ev-dot{box-shadow:0 0 0 1.5px #fff}
+.app-mode .app-events{order:3;display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.app-mode .app-events:empty{display:none}
+.app-mode .app-event{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;cursor:pointer}
+.app-mode .app-event>i{font-size:20px;flex-shrink:0}
+.app-mode .app-event div{min-width:0;flex:1}
+.app-mode .app-event b{display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-mode .app-event small{display:block;font-size:12px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-mode .event-entry{font-size:13px;padding:7px 10px;border-radius:8px}
+.app-mode .ev-modal-body{max-height:55vh}
 /* Rooms: one card per office, one day at a time (swipe to change day) */
 .app-mode .day-scroll{order:5;overflow:visible;touch-action:pan-y}
 .app-mode .day-cols{display:block;min-width:0;border:none;border-radius:0;background:none;overflow:visible}
@@ -247,8 +286,11 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
       <div class="legend-item"><div class="legend-dot" style="background:#C0DD97"></div>Office 5</div>
       <div class="legend-item"><div class="window-legend"></div>Window</div>
       <div class="legend-item"><div class="pano-legend"></div>Panorama screen</div>
+      <div class="legend-item"><div class="legend-dot ev-lecture"></div>Lecture Series</div>
+      <div class="legend-item"><div class="legend-dot ev-jf"></div>Jour fixe</div>
     </div>
     <div class="app-day-title" id="app-day-title"></div>
+    <div class="app-events" id="app-events"></div>
     <div class="day-scroll"><div class="day-cols" id="desk-grid"></div></div>
   </div>
  
@@ -328,6 +370,13 @@ h1{font-size:20px;font-weight:500;margin-bottom:1.5rem;display:flex;align-items:
       <button class="btn-primary" id="btn-book" onclick="confirmBook()">Book</button>
       <button class="btn-danger" id="btn-cancel" style="display:none" onclick="cancelBook()">Remove</button>
     </div>
+  </div>
+</div>
+<div class="modal-bg" id="event-modal" style="display:none" onclick="if(event.target===this)closeEvents()">
+  <div class="modal ev-modal">
+    <h3 id="event-modal-title"></h3>
+    <div class="ev-modal-body" id="event-modal-body"></div>
+    <div class="modal-btns"><button class="btn-secondary" onclick="closeEvents()">Close</button></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -483,7 +532,7 @@ function renderDesks(){
   let h='<div class="day-header"></div>';
   DAYS.forEach((d,i)=>{
     const t=isToday(mon,i),p=isPast(mon,i);
-    h+=`<div class="day-header${t?' today':p?' past':''}">${d}<br><span style="font-size:10px">${new Date(dateKey(mon,i)).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'})}</span></div>`;
+    h+=`<div class="day-header${t?' today':p?' past':''}">${d}<br><span style="font-size:10px">${new Date(dateKey(mon,i)).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit'})}</span>${eventTags(dateKey(mon,i))}</div>`;
   });
   ROOMS.forEach((room,ri)=>{
     h+=`<div class="room-label"><span style="width:8px;height:8px;border-radius:50%;background:${room.color};display:inline-block;flex-shrink:0"></span>${room.name}<span class="room-free" data-room="${ri}"></span></div>`;
@@ -506,7 +555,7 @@ function renderDesks(){
     const dk=dateKey(mon,di);
     let total=0,booked=0;
     ROOMS.forEach((room,ri)=>{total+=room.desks;for(let desk=0;desk<room.desks;desk++){if(bookings[`${dk}_r${ri}_d${desk}`])booked++;}});
-    sh+=`<div class="stat${isToday(mon,di)?' today':''}" data-pick="${di}" onclick="pickAppDay(${di})"><div class="stat-num">${booked}/${total}</div><div class="stat-label">${d}${isToday(mon,di)?'<span class="stat-today"> · today</span>':''}</div><div class="stat-date">${+dk.slice(8)}</div></div>`;
+    sh+=`<div class="stat${isToday(mon,di)?' today':''}" data-pick="${di}" onclick="pickAppDay(${di})"><div class="stat-num">${booked}/${total}</div><div class="stat-label">${d}${isToday(mon,di)?'<span class="stat-today"> · today</span>':''}</div><div class="stat-date">${+dk.slice(8)}</div>${eventDots(dk)}</div>`;
   });
   document.getElementById('stats-bar').innerHTML=sh;
   applyAppDay();
@@ -537,6 +586,10 @@ function applyAppDay(){
   });
   const title=day.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
   document.getElementById('app-day-title').innerHTML=`<span>${isToday(mon,appDay)?'Today · ':''}${title}</span><small>${past?'Past day':`${freeAll} of ${total} desks free`}</small>`;
+  const dk=dateKey(mon,appDay);
+  document.getElementById('app-events').innerHTML=(dayEvents[dk]||[]).map(ev=>
+    `<div class="app-event ev-${ev.kind}" onclick="openEvents('${dk}')"><i class="ti ${EVENT_KINDS[ev.kind].icon}"></i><div><b>${escapeHtml(ev.head)}</b>${ev.sub?`<small>${escapeHtml(ev.sub)}</small>`:''}</div><i class="ti ti-chevron-right" style="font-size:16px;opacity:.6"></i></div>`
+  ).join('');
 }
 function pickAppDay(i){
   if(!isAppMode()||i===appDay)return;
@@ -582,6 +635,9 @@ function renderAbsences(){
   DAYS.forEach((d,di)=>{
     const dk=dateKey(mon,di),t=isToday(mon,di),mmdd=dk.slice(5);
     let listHtml='';
+    (dayEvents[dk]||[]).forEach(ev=>{
+      listHtml+=`<div class="event-entry ev-${ev.kind}" onclick="openEvents('${dk}')" title="Click for details"><i class="ti ${EVENT_KINDS[ev.kind].icon}"></i><span>${escapeHtml(ev.head)}</span></div>`;
+    });
     birthdays.filter(b=>b.date===mmdd).forEach(b=>{
       listHtml+=`<div class="birthday-entry" onclick="openCancelBirthday('${b.key}','${escapeAttr(b.name)}')" title="Click to remove">🎂 <span>${escapeHtml(b.name)}</span></div>`;
     });
@@ -857,7 +913,69 @@ async function installApp(){
   }
 }
 
+// ── Events (Lecture Series + Jour fixe) ──────────────────────────────────────
+// The dates come from a small Apps Script attached to the group's Google Sheet
+// (see apps-script/events.gs). The script only hands out the event rows, so the
+// sheet itself stays private. If it can't be reached, no events are shown.
+const EVENTS_URL='https://script.google.com/macros/s/AKfycbwBZL5K_Wsv00VtdzBn7zv9DM6LjnnbB-8GKj6DZnfnKSOxV2G5orvj9TmqWjIct_e2Yg/exec'; // paste the Apps Script web app URL here
+const EVENT_KINDS={
+  lecture:{label:'Lecture Series',short:'Lecture',  icon:'ti-school'},
+  jf:     {label:'Jour fixe',     short:'Jour fixe',icon:'ti-users-group'}
+};
+const EVENTS_CACHE_KEY='office-booking-events-v1';
+let dayEvents={};
+try{dayEvents=JSON.parse(localStorage.getItem(EVENTS_CACHE_KEY))||{};}catch(e){}
+
+function eventTags(dk){
+  const evs=dayEvents[dk]||[];
+  return `<div class="ev-tags">${evs.map(ev=>`<span class="ev-tag ev-${ev.kind}" onclick="openEvents('${dk}')" title="${escapeHtml(ev.head)} – click for details"><i class="ti ${EVENT_KINDS[ev.kind].icon}"></i>${EVENT_KINDS[ev.kind].short}</span>`).join('')}</div>`;
+}
+function eventDots(dk){
+  const evs=dayEvents[dk]||[];
+  return evs.length?`<span class="ev-dots">${evs.map(ev=>`<span class="ev-dot ev-${ev.kind}" title="${EVENT_KINDS[ev.kind].label}"></span>`).join('')}</span>`:'';
+}
+function openEvents(dk){
+  const evs=dayEvents[dk]||[];if(!evs.length)return;
+  document.getElementById('event-modal-title').textContent=new Date(dk+'T00:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('event-modal-body').innerHTML=evs.map(ev=>
+    `<div class="ev-item ev-${ev.kind}"><div class="ev-item-kind"><i class="ti ${EVENT_KINDS[ev.kind].icon}"></i>${EVENT_KINDS[ev.kind].label}</div><div class="ev-item-title">${escapeHtml(ev.title)}</div><dl>${ev.lines.map(([k,v])=>`<dt>${k}</dt><dd>${escapeHtml(v)}</dd>`).join('')}</dl></div>`
+  ).join('');
+  document.getElementById('event-modal').style.display='flex';
+}
+function closeEvents(){document.getElementById('event-modal').style.display='none';}
+
+async function loadEvents(){
+  if(EVENTS_URL.startsWith('YOUR_'))return;                          // not set up yet
+  try{
+    // Script answers {lecture:[[date,speaker,host,title,room,chair]], jf:[[date,type,chair,agenda?]]}, dates as YYYY-MM-DD
+    const data=await (await fetch(EVENTS_URL,{cache:'no-store'})).json();   // no-store: always ask the script, never wait on the browser cache
+    const out={},add=(dk,ev)=>{if(/^\d{4}-\d\d-\d\d$/.test(dk))(out[dk]=out[dk]||[]).push(ev);};
+    const lines=pairs=>pairs.filter(([,v])=>v&&v!=='-');
+    (data.lecture||[]).forEach(([date,speaker='',host='',title='',room='',chair=''])=>{
+      if(/^no lecture/i.test(speaker))return;                        // "No Lecture Series"
+      add(date,{kind:'lecture',
+        head:`Lecture Series${speaker?' · '+speaker:''}`,
+        sub:title||room,
+        title:title||(speaker?`Talk by ${speaker}`:'Speaker to be announced'),
+        lines:lines([['Speaker',speaker],['Room',room],['Chair',chair],['Host',host]])});
+    });
+    (data.jf||[]).forEach(([date,type='',chair='',agenda=''])=>{
+      if(/^\s*(no jour ?fixe|cancel)/i.test(agenda))return;          // "no Jour fixe", "cancelled …"
+      add(date,{kind:'jf',
+        head:`Jour fixe${type?' · '+type:''}`,
+        sub:chair&&chair!=='-'?`Chair: ${chair}`:'',
+        title:type?`${type} Jour fixe`:'Jour fixe',
+        lines:lines([['Chair',chair],['Agenda',agenda]])});
+    });
+    dayEvents=out;
+    try{localStorage.setItem(EVENTS_CACHE_KEY,JSON.stringify(out));}catch(e){}
+    renderDesks();
+    if(currentTab==='abs')renderAbsences();
+  }catch(e){console.warn('Could not load events from the sheet:',e);}
+}
+
 loadBookings();
+loadEvents();
 </script>
 </body>
 </html>
